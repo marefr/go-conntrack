@@ -9,7 +9,8 @@ import (
 	"os"
 	"syscall"
 
-	prom "github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 type failureReason string
@@ -22,54 +23,46 @@ const (
 )
 
 var (
-	dialerAttemptedTotal = prom.NewCounterVec(
-		prom.CounterOpts{
+	dialerAttemptedTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
 			Namespace: "net",
 			Subsystem: "conntrack",
 			Name:      "dialer_conn_attempted_total",
 			Help:      "Total number of connections attempted by the given dialer a given name.",
 		}, []string{"dialer_name"})
 
-	dialerConnEstablishedTotal = prom.NewCounterVec(
-		prom.CounterOpts{
+	dialerConnEstablishedTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
 			Namespace: "net",
 			Subsystem: "conntrack",
 			Name:      "dialer_conn_established_total",
 			Help:      "Total number of connections successfully established by the given dialer a given name.",
 		}, []string{"dialer_name"})
 
-	dialerConnFailedTotal = prom.NewCounterVec(
-		prom.CounterOpts{
+	dialerConnFailedTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
 			Namespace: "net",
 			Subsystem: "conntrack",
 			Name:      "dialer_conn_failed_total",
 			Help:      "Total number of connections failed to dial by the dialer a given name.",
 		}, []string{"dialer_name", "reason"})
 
-	dialerConnClosedTotal = prom.NewCounterVec(
-		prom.CounterOpts{
+	dialerConnClosedTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
 			Namespace: "net",
 			Subsystem: "conntrack",
 			Name:      "dialer_conn_closed_total",
 			Help:      "Total number of connections closed which originated from the dialer of a given name.",
 		}, []string{"dialer_name"})
 
-	dialerConnOpen = prom.NewGaugeVec(
-		prom.GaugeOpts{
+	dialerConnOpen = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
 			Namespace: "net",
 			Subsystem: "conntrack",
 			Name:      "dialer_conn_open",
 			Help:      "Number of open connections which originated from the dialer of a given name.",
 		}, []string{"dialer_name"})
 )
-
-func init() {
-	prom.MustRegister(dialerAttemptedTotal)
-	prom.MustRegister(dialerConnEstablishedTotal)
-	prom.MustRegister(dialerConnFailedTotal)
-	prom.MustRegister(dialerConnClosedTotal)
-	prom.MustRegister(dialerConnOpen)
-}
 
 // preRegisterDialerMetrics pre-populates Prometheus labels for the given dialer name, to avoid Prometheus missing labels issue.
 func PreRegisterDialerMetrics(dialerName string) {

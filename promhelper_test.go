@@ -24,9 +24,8 @@ func fetchPrometheusLines(t *testing.T, metricName string, matchingLabelValues .
 		line, err := reader.ReadString('\n')
 		if err == io.EOF {
 			break
-		} else {
-			require.NoError(t, err, "error reading stuff")
 		}
+		require.NoError(t, err, "error reading stuff")
 		if !strings.HasPrefix(line, metricName) {
 			continue
 		}

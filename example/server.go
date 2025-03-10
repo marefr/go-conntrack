@@ -21,7 +21,7 @@ import (
 
 var (
 	port            = flag.Int("port", 9090, "whether to use tls or not")
-	useTls          = flag.Bool("tls", true, "Whether to use TLS and HTTP2.")
+	useTLS          = flag.Bool("tls", true, "Whether to use TLS and HTTP2.")
 	tlsCertFilePath = flag.String("tls_cert_file", "certs/localhost.crt", "Path to the CRT/PEM file.")
 	tlsKeyFilePath  = flag.String("tls_key_file", "certs/localhost.key", "Path to the private key file.")
 )
@@ -64,14 +64,14 @@ func main() {
 		log.Fatalf("Failed to listen: %v", err)
 	}
 	listener = conntrack.NewListener(listener, conntrack.TrackWithTracing())
-	if !*useTls {
+	if !*useTLS {
 		httpListener = listener
 	} else {
-		tlsConfig, err := connhelpers.TlsConfigForServerCerts(*tlsCertFilePath, *tlsKeyFilePath)
+		tlsConfig, err := connhelpers.TLSConfigForServerCerts(*tlsCertFilePath, *tlsKeyFilePath)
 		if err != nil {
 			log.Fatalf("Failed configuring TLS: %v", err)
 		}
-		tlsConfig, err = connhelpers.TlsConfigWithHttp2Enabled(tlsConfig)
+		tlsConfig, err = connhelpers.TLSConfigWithHTTP2Enabled(tlsConfig)
 		if err != nil {
 			log.Fatalf("Failed configuring TLS: %v", err)
 		}

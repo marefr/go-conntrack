@@ -54,11 +54,11 @@ listener, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
 listener = conntrack.NewListener(listener,
     conntrack.TrackWithName("http"),
     conntrack.TrackWithTracing(),
-    conntrack.TrackWithTcpKeepAlive(5 * time.Minute))
+    conntrack.TrackWithTCPKeepAlive(5 * time.Minute))
 httpServer.Serve(listener)
 ```
 
-Note, the `TrackWithTcpKeepAlive`. The default `http.ListenAndServe` adds a tcp keep alive wrapper to inbound TCP connections. `conntrack.NewListener` allows you to do that without another layer of wrapping.
+Note, the `TrackWithTCPKeepAlive`. The default `http.ListenAndServe` adds a tcp keep alive wrapper to inbound TCP connections. `conntrack.NewListener` allows you to do that without another layer of wrapping.
 
 #### TLS server example
 
@@ -69,9 +69,9 @@ listener, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
 listener = conntrack.NewListener(listener,
     conntrack.TrackWithName("https"),
     conntrack.TrackWithTracing(),
-    conntrack.TrackWithTcpKeepAlive(5 * time.Minutes))
-tlsConfig, err := connhelpers.TlsConfigForServerCerts(*tlsCertFilePath, *tlsKeyFilePath)
-tlsConfig, err = connhelpers.TlsConfigWithHttp2Enabled(tlsConfig)
+    conntrack.TrackWithTCPKeepAlive(5 * time.Minutes))
+tlsConfig, err := connhelpers.TLSConfigForServerCerts(*tlsCertFilePath, *tlsKeyFilePath)
+tlsConfig, err = connhelpers.TLSConfigWithHTTP2Enabled(tlsConfig)
 tlsListener := tls.NewListener(listener, tlsConfig)
 httpServer.Serve(listener)
 ```

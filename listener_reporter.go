@@ -3,38 +3,35 @@
 
 package conntrack
 
-import prom "github.com/prometheus/client_golang/prometheus"
+import (
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+)
 
 var (
-	listenerAcceptedTotal = prom.NewCounterVec(
-		prom.CounterOpts{
+	listenerAcceptedTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
 			Namespace: "net",
 			Subsystem: "conntrack",
 			Name:      "listener_conn_accepted_total",
 			Help:      "Total number of connections opened to the listener of a given name.",
 		}, []string{"listener_name"})
 
-	listenerClosedTotal = prom.NewCounterVec(
-		prom.CounterOpts{
+	listenerClosedTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
 			Namespace: "net",
 			Subsystem: "conntrack",
 			Name:      "listener_conn_closed_total",
 			Help:      "Total number of connections closed that were made to the listener of a given name.",
 		}, []string{"listener_name"})
-	listenerOpen = prom.NewGaugeVec(
-		prom.GaugeOpts{
+	listenerOpen = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
 			Namespace: "net",
 			Subsystem: "conntrack",
 			Name:      "listener_conn_open",
 			Help:      "Number of open connections to the listener of a given name.",
 		}, []string{"listener_name"})
 )
-
-func init() {
-	prom.MustRegister(listenerAcceptedTotal)
-	prom.MustRegister(listenerClosedTotal)
-	prom.MustRegister(listenerOpen)
-}
 
 // preRegisterListener pre-populates Prometheus labels for the given listener name, to avoid Prometheus missing labels issue.
 func preRegisterListenerMetrics(listenerName string) {

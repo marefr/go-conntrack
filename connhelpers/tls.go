@@ -8,9 +8,9 @@ import (
 	"fmt"
 )
 
-// TlsConfigForServerCerts is a returns a simple `tls.Config` with the given server cert loaded.
+// TLSConfigForServerCerts is a returns a simple `tls.Config` with the given server cert loaded.
 // This is useful if you can't use `http.ListenAndServerTLS` when using a custom `net.Listener`.
-func TlsConfigForServerCerts(certFile string, keyFile string) (*tls.Config, error) {
+func TLSConfigForServerCerts(certFile string, keyFile string) (*tls.Config, error) {
 	var err error
 	config := new(tls.Config)
 	config.Certificates = make([]tls.Certificate, 1)
@@ -21,9 +21,9 @@ func TlsConfigForServerCerts(certFile string, keyFile string) (*tls.Config, erro
 	return config, nil
 }
 
-// TlsConfigWithHttp2Enabled makes it easy to configure the given `tls.Config` to prefer H2 connections.
+// TLSConfigWithHTTP2Enabled makes it easy to configure the given `tls.Config` to prefer H2 connections.
 // This is useful if you can't use `http.ListenAndServerTLS` when using a custom `net.Listener`.
-func TlsConfigWithHttp2Enabled(config *tls.Config) (*tls.Config, error) {
+func TLSConfigWithHTTP2Enabled(config *tls.Config) (*tls.Config, error) {
 	// mostly based on http2 code in the standards library.
 	if config.CipherSuites != nil {
 		// If they already provided a CipherSuite list, return

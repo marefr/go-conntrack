@@ -32,7 +32,7 @@ func (s *DialerTestSuite) SetupSuite() {
 	s.serverListener, err = net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(s.T(), err, "must be able to allocate a port for serverListener")
 	s.httpServer = http.Server{
-		Handler: http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+		Handler: http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
 			resp.WriteHeader(http.StatusOK)
 		}),
 	}
@@ -45,7 +45,7 @@ func (s *DialerTestSuite) TestDialerMetricsArePreregistered() {
 	conntrack.NewDialContextFunc() // dialer name = default
 	conntrack.NewDialContextFunc(conntrack.DialWithName("foobar"))
 	conntrack.PreRegisterDialerMetrics("something_manual")
-	for testId, testCase := range []struct {
+	for testID, testCase := range []struct {
 		metricName     string
 		existingLabels []string
 	}{
@@ -67,13 +67,13 @@ func (s *DialerTestSuite) TestDialerMetricsArePreregistered() {
 		{"net_conntrack_dialer_conn_open", []string{"something_manual"}},
 	} {
 		lineCount := len(fetchPrometheusLines(s.T(), testCase.metricName, testCase.existingLabels...))
-		assert.NotEqual(s.T(), 0, lineCount, "metrics must exist for test case %d", testId)
+		assert.NotEqual(s.T(), 0, lineCount, "metrics must exist for test case %d", testID)
 	}
 }
 
 func (s *DialerTestSuite) TestDialerMetricsAreNotPreregisteredWithMonitoringOff() {
 	conntrack.NewDialContextFunc(conntrack.DialWithName("nomon"), conntrack.DialWithoutMonitoring())
-	for testId, testCase := range []struct {
+	for testID, testCase := range []struct {
 		metricName     string
 		existingLabels []string
 	}{
@@ -87,7 +87,7 @@ func (s *DialerTestSuite) TestDialerMetricsAreNotPreregisteredWithMonitoringOff(
 		{"net_conntrack_dialer_conn_open", []string{"nomon"}},
 	} {
 		lineCount := len(fetchPrometheusLines(s.T(), testCase.metricName, testCase.existingLabels...))
-		assert.Equal(s.T(), 0, lineCount, "metrics should not be registered exist for test case %d", testId)
+		assert.Equal(s.T(), 0, lineCount, "metrics should not be registered exist for test case %d", testID)
 	}
 }
 

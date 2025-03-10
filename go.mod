@@ -1,10 +1,9 @@
 module github.com/marefr/go-conntrack
 
-go 1.24.1
+go 1.23.0
 
 require (
 	github.com/jpillora/backoff v1.0.0
-	github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f
 	github.com/prometheus/client_golang v1.21.1
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/net v0.37.0

@@ -12,10 +12,6 @@ import (
 	"golang.org/x/net/trace"
 )
 
-var (
-	dialerNameKey = "conntrackDialerKey"
-)
-
 type dialerOpts struct {
 	name                  string
 	monitoring            bool
@@ -62,9 +58,11 @@ func DialWithDialContextFunc(parentDialerFunc dialerContextFunc) dialerOpt {
 	}
 }
 
+type dialerNameKey struct{}
+
 // DialNameFromContext returns the name of the dialer from the context of the DialContext func, if any.
 func DialNameFromContext(ctx context.Context) string {
-	val, ok := ctx.Value(dialerNameKey).(string)
+	val, ok := ctx.Value(dialerNameKey{}).(string)
 	if !ok {
 		return ""
 	}
@@ -73,7 +71,7 @@ func DialNameFromContext(ctx context.Context) string {
 
 // DialNameToContext returns a context that will contain a dialer name override.
 func DialNameToContext(ctx context.Context, dialerName string) context.Context {
-	return context.WithValue(ctx, dialerNameKey, dialerName)
+	return context.WithValue(ctx, dialerNameKey{}, dialerName)
 }
 
 // NewDialContextFunc returns a `DialContext` function that tracks outbound connections.

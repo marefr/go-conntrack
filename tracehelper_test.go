@@ -2,7 +2,7 @@ package conntrack_test
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -17,7 +17,7 @@ func fetchTraceEvents(t *testing.T, familyName string) string {
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err, "failed creating request for Prometheus handler")
 	trace.RenderEvents(resp, req, true)
-	out, err := ioutil.ReadAll(resp.Body)
+	out, err := io.ReadAll(resp.Body)
 	require.NoError(t, err, "failed reading the trace page")
 	return string(out)
 }

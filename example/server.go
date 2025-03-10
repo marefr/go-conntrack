@@ -43,7 +43,9 @@ func main() {
 	handler := func(resp http.ResponseWriter, req *http.Request) {
 		resp.WriteHeader(http.StatusOK)
 		resp.Header().Add("Content-Type", "application/json")
-		resp.Write([]byte(`{"msg": "hello"}`))
+		if _, err := resp.Write([]byte(`{"msg": "hello"}`)); err != nil {
+			log.Printf("Failed to write response: %v", err)
+		}
 		callCtx := conntrack.DialNameToContext(req.Context(), "google")
 		_, err := ctxhttp.Get(callCtx, http.DefaultClient, "https://www.google.comx")
 		log.Printf("Google reached with err: %v", err)

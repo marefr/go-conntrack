@@ -110,8 +110,13 @@ func (ct *connTrackListener) Accept() (net.Conn, error) {
 		return nil, err
 	}
 	if tcpConn, ok := conn.(*net.TCPConn); ok && ct.opts.tcpKeepAlive > 0 {
-		tcpConn.SetKeepAlive(true)
-		tcpConn.SetKeepAlivePeriod(ct.opts.tcpKeepAlive)
+		if err := tcpConn.SetKeepAlive(true); err != nil {
+			return nil, fmt.Errorf("failed to enable keep alive: %w", err)
+		}
+
+		if err := tcpConn.SetKeepAlivePeriod(ct.opts.tcpKeepAlive); err != nil {
+			return nil, fmt.Errorf("failed to set keep alive period: %w", err)
+		}
 	}
 	return newServerConnTracker(conn, ct.opts), nil
 }

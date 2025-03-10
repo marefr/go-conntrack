@@ -44,7 +44,7 @@ func (s *ListenerTestSuite) SetupSuite() {
 		}),
 	}
 	go func() {
-		s.httpServer.Serve(s.serverListener)
+		_ = s.httpServer.Serve(s.serverListener)
 	}()
 }
 

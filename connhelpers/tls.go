@@ -41,9 +41,6 @@ func TlsConfigWithHttp2Enabled(config *tls.Config) (*tls.Config, error) {
 		}
 	}
 
-	//nolint:staticcheck
-	config.PreferServerCipherSuites = true
-
 	haveNPN := false
 	for _, p := range config.NextProtos {
 		if p == "h2" {

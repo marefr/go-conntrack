@@ -39,7 +39,7 @@ func (s *ListenerTestSuite) SetupSuite() {
 	require.NoError(s.T(), err, "must be able to allocate a port for serverListener")
 	s.serverListener = conntrack.NewListener(s.serverListener, conntrack.TrackWithName(listenerName), conntrack.TrackWithTracing())
 	s.httpServer = http.Server{
-		Handler: http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+		Handler: http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
 			resp.WriteHeader(http.StatusOK)
 		}),
 	}
@@ -52,7 +52,7 @@ func (s *ListenerTestSuite) TestTrackingMetricsPreregistered() {
 	// this will create the default listener, check if it is registered
 	conntrack.NewListener(s.serverListener)
 
-	for testId, testCase := range []struct {
+	for testID, testCase := range []struct {
 		metricName     string
 		existingLabels []string
 	}{
@@ -64,7 +64,7 @@ func (s *ListenerTestSuite) TestTrackingMetricsPreregistered() {
 		{"net_conntrack_listener_conn_open", []string{listenerName}},
 	} {
 		lineCount := len(fetchPrometheusLines(s.T(), testCase.metricName, testCase.existingLabels...))
-		assert.NotEqual(s.T(), 0, lineCount, "metrics must exist for test case %d", testId)
+		assert.NotEqual(s.T(), 0, lineCount, "metrics must exist for test case %d", testID)
 	}
 }
 

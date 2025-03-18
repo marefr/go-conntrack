@@ -25,24 +25,24 @@ type listenerOpts struct {
 	retryBackoff *backoff.Backoff
 }
 
-type listenerOpt func(*listenerOpts)
+type ListenerOpt func(*listenerOpts)
 
 // TrackWithName sets the name of the Listener for use in tracking and monitoring.
-func TrackWithName(name string) listenerOpt {
+func TrackWithName(name string) ListenerOpt {
 	return func(opts *listenerOpts) {
 		opts.name = name
 	}
 }
 
 // TrackWithoutMonitoring turns *off* Prometheus monitoring for this listener.
-func TrackWithoutMonitoring() listenerOpt {
+func TrackWithoutMonitoring() ListenerOpt {
 	return func(opts *listenerOpts) {
 		opts.monitoring = false
 	}
 }
 
 // TrackWithTracing turns *on* the /debug/events tracing of the live listener connections.
-func TrackWithTracing() listenerOpt {
+func TrackWithTracing() ListenerOpt {
 	return func(opts *listenerOpts) {
 		opts.tracing = true
 	}
@@ -50,17 +50,17 @@ func TrackWithTracing() listenerOpt {
 
 // TrackWithRetries enables retrying of temporary Accept() errors, with the given backoff between attempts.
 // Concurrent accept calls that receive temporary errors have independent backoff scaling.
-func TrackWithRetries(b backoff.Backoff) listenerOpt {
+func TrackWithRetries(b backoff.Backoff) ListenerOpt {
 	return func(opts *listenerOpts) {
 		opts.retryBackoff = &b
 	}
 }
 
-// TrackWithTcpKeepAlive makes sure that any `net.TCPConn` that get accepted have a keep-alive.
+// TrackWithTCPKeepAlive makes sure that any `net.TCPConn` that get accepted have a keep-alive.
 // This is useful for HTTP servers in order for, for example laptops, to not use up resources on the
 // server while they don't utilise their connection.
 // A value of 0 disables it.
-func TrackWithTcpKeepAlive(keepalive time.Duration) listenerOpt {
+func TrackWithTCPKeepAlive(keepalive time.Duration) ListenerOpt {
 	return func(opts *listenerOpts) {
 		opts.tcpKeepAlive = keepalive
 	}
@@ -72,7 +72,7 @@ type connTrackListener struct {
 }
 
 // NewListener returns the given listener wrapped in connection tracking listener.
-func NewListener(inner net.Listener, optFuncs ...listenerOpt) net.Listener {
+func NewListener(inner net.Listener, optFuncs ...ListenerOpt) net.Listener {
 	opts := &listenerOpts{
 		name:       defaultName,
 		monitoring: true,

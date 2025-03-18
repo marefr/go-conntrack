@@ -1,19 +1,23 @@
-// Copyright 2016 Michal Witkowski. All Rights Reserved.
-// See LICENSE for licensing terms.
-
 package main
 
 import (
 	"crypto/tls"
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
+	"os"
 	"time"
 
-	"github.com/marefr/go-conntrack"
-	"github.com/marefr/go-conntrack/connhelpers"
+	promtracker "github.com/marefr/go-conntrack/providers/prometheus"
+	"github.com/marefr/go-conntrack/providers/trace"
+	"github.com/marefr/go-conntrack/v2"
+	"github.com/marefr/go-conntrack/v2/connhelpers"
+	"github.com/marefr/go-conntrack/v2/logging"
+	"github.com/marefr/go-conntrack/v2/logging/slogadapter"
+
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/net/context/ctxhttp"
 	_ "golang.org/x/net/trace"
@@ -21,7 +25,7 @@ import (
 
 var (
 	port            = flag.Int("port", 9090, "whether to use tls or not")
-	useTls          = flag.Bool("tls", true, "Whether to use TLS and HTTP2.")
+	useTLS          = flag.Bool("tls", true, "Whether to use TLS and HTTP2.")
 	tlsCertFilePath = flag.String("tls_cert_file", "certs/localhost.crt", "Path to the CRT/PEM file.")
 	tlsKeyFilePath  = flag.String("tls_key_file", "certs/localhost.key", "Path to the private key file.")
 )
@@ -29,27 +33,42 @@ var (
 func main() {
 	flag.Parse()
 
+	tracingTracker := trace.New()
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	loggingTracker := logging.New(slogadapter.Logger(logger))
+	dialerMetrics := promtracker.NewDialerMetrics()
+	prometheus.MustRegister(dialerMetrics)
+	// Since we're using a dynamic name, let's preregister it with prometheus.
+	dialerMetrics.InitializeMetrics("google")
+
 	// Make sure all outbound connections use the wrapped dialer.
 	http.DefaultTransport.(*http.Transport).DialContext = conntrack.NewDialContextFunc(
-		conntrack.DialWithTracing(),
 		conntrack.DialWithDialer(&net.Dialer{
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
 		}),
+		conntrack.DialWithTrackers(tracingTracker, loggingTracker, dialerMetrics.TrackDialer()),
 	)
-	// Since we're using a dynamic name, let's preregister it with prometheus.
-	conntrack.PreRegisterDialerMetrics("google")
 
-	handler := func(resp http.ResponseWriter, req *http.Request) {
-		resp.WriteHeader(http.StatusOK)
-		resp.Header().Add("Content-Type", "application/json")
-		if _, err := resp.Write([]byte(`{"msg": "hello"}`)); err != nil {
-			log.Printf("Failed to write response: %v", err)
+	handler := func(rw http.ResponseWriter, req *http.Request) {
+		rw.WriteHeader(http.StatusOK)
+		rw.Header().Add("Content-Type", "application/json")
+		if _, err := rw.Write([]byte(`{"msg": "hello"}`)); err != nil {
+			logger.Error("Failed to write response", "error", err)
 		}
-		callCtx := conntrack.DialNameToContext(req.Context(), "google")
-		_, err := ctxhttp.Get(callCtx, http.DefaultClient, "https://www.google.comx")
-		log.Printf("Google reached with err: %v", err)
-		log.Printf("Got request: %v", req)
+		callCtx := conntrack.WithDialName(req.Context(), "google")
+		resp, err := ctxhttp.Get(callCtx, http.DefaultClient, "https://www.google.comx")
+		if err != nil {
+			logger.Error("Failed to get response from Google", "error", err)
+		} else {
+			defer func() {
+				if err := resp.Body.Close(); err != nil {
+					logger.Error("Failed to close response body", "error", err)
+				}
+			}()
+
+			logger.Info("Received response from Google", "status", resp.Status)
+		}
 	}
 
 	http.DefaultServeMux.Handle("/", http.HandlerFunc(handler))
@@ -61,27 +80,37 @@ func main() {
 	var httpListener net.Listener
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
 	if err != nil {
-		log.Fatalf("Failed to listen: %v", err)
+		logger.Error("Failed to listen", "error", err)
+		os.Exit(1)
 	}
-	listener = conntrack.NewListener(listener, conntrack.TrackWithTracing())
-	if !*useTls {
+
+	listenerMetrics := promtracker.NewListenerMetrics()
+	prometheus.MustRegister(listenerMetrics)
+	listenerMetrics.InitializeMetrics("default")
+	listener = conntrack.NewListener(listener,
+		conntrack.ListenerWithTrackers(tracingTracker, loggingTracker, listenerMetrics.TrackListener()))
+	if !*useTLS {
 		httpListener = listener
 	} else {
-		tlsConfig, err := connhelpers.TlsConfigForServerCerts(*tlsCertFilePath, *tlsKeyFilePath)
+		tlsConfig, err := connhelpers.TLSConfigForServerCerts(*tlsCertFilePath, *tlsKeyFilePath)
 		if err != nil {
-			log.Fatalf("Failed configuring TLS: %v", err)
+			logger.Error("Failed configuring TLS", "error", err)
+			os.Exit(1)
 		}
-		tlsConfig, err = connhelpers.TlsConfigWithHttp2Enabled(tlsConfig)
+		tlsConfig, err = connhelpers.TLSConfigWithHTTP2Enabled(tlsConfig)
 		if err != nil {
-			log.Fatalf("Failed configuring TLS: %v", err)
+			logger.Error("Failed configuring TLS with HTTP2", "error", err)
+			os.Exit(1)
 		}
-		log.Printf("Listening with TLS")
+
+		logger.Info("Listening with TLS")
 		tlsListener := tls.NewListener(listener, tlsConfig)
 		httpListener = tlsListener
 	}
-	//httpListener.Addr()
-	log.Printf("Listening on: %s", listener.Addr().String())
+
+	logger.Info("Listening", "addr", listener.Addr().String())
 	if err := httpServer.Serve(httpListener); err != nil {
-		log.Fatalf("Failed listning: %v", err)
+		logger.Error("Failed listening", "error", err)
+		os.Exit(1)
 	}
 }

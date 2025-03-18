@@ -1,14 +1,13 @@
+include .bingo/Variables.mk
+
 # Note: Macos requires `brew install findutils` to support xargs -i
 
 PROVIDER_MODULES ?= $(shell find $(PWD)/providers  -name "go.mod" | xargs dirname)
 MODULES          ?= $(PROVIDER_MODULES) example
 
-GOTOOL=go tool
-COPYRIGHT=$(GOTOOL) copyright
+.PHONY: replace-add replace-drop deps lint test $(MODULES)
 
-.PHONY: replace-add replace-drop lint test $(MODULES)
-
-replace-add replace-drop lint test: $(MODULES)
+replace-add replace-drop deps lint test: $(MODULES)
 $(MODULES):
 	$(MAKE) -C $@ $(MAKECMDGOALS)
 
@@ -30,6 +29,9 @@ define require_clean_work_tree
 	fi
 
 endef
+
+deps:
+	go mod tidy
 
 lint:
 	@echo ">> ensuring copyright headers"

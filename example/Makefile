@@ -10,6 +10,9 @@ replace-drop:
 	go mod edit -dropreplace=github.com/marefr/go-conntrack/providers/trace
 	go mod tidy
 
+deps:
+	go mod tidy
+
 lint:
 	golangci-lint run --config=../.golangci.yml
 

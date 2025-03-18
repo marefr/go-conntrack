@@ -1,3 +1,6 @@
+// Copyright (c) The go-conntrack Authors.
+// Licensed under the Apache License 2.0.
+
 package prometheus
 
 import "github.com/prometheus/client_golang/prometheus"

@@ -4,6 +4,7 @@ include .bingo/Variables.mk
 
 PROVIDER_MODULES ?= $(shell find $(PWD)/providers  -name "go.mod" | xargs dirname)
 MODULES          ?= $(PROVIDER_MODULES) example
+GOBIN            ?= $(firstword $(subst :, ,${GOPATH}))/bin
 
 .PHONY: replace-add replace-drop deps lint test $(MODULES)
 
@@ -33,7 +34,7 @@ endef
 deps:
 	go mod tidy
 
-lint:
+lint: $(COPYRIGHT)
 	@echo ">> ensuring copyright headers"
 	@$(COPYRIGHT) $(shell go list -f "{{.Dir}}" ./... | xargs -i find "{}" -name "*.go")
 	@$(call require_clean_work_tree,"set copyright headers")

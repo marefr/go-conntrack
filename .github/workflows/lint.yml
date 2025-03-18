@@ -2,15 +2,8 @@
 name: golangci-lint
 on:
   push:
-    branches: [ "main" ]
-    paths:
-      - "go.sum"
-      - "go.mod"
-      - "**.go"
-      - ".github/workflows/limt.yml"
-      - ".golangci.yml"
+    branches: [ "main", "v1", "v2" ]
   pull_request:
-    branches: [ "main" ]
 
 permissions:
   contents: read

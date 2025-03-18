@@ -8,12 +8,13 @@ on:
 
 jobs:
 
-  build:
+  test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        go: [ '1.23', '1.24' ]
-    name: Go ${{ matrix.go }}
+        go: ["oldstable", "stable"]
+    name: Tests on Go ${{ matrix.go }}
     steps:
     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
@@ -23,8 +24,5 @@ jobs:
         go-version: ${{ matrix.go }}
         check-latest: true
 
-    - name: Build
-      run: go build -v ./...
-
-    - name: Test
-      run: go test -v ./...
+    - name: Run tests
+      run: make test

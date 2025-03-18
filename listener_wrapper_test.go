@@ -97,6 +97,8 @@ func (s *ListenerTestSuite) TestListenerWithContextName() {
 	_, err := (&net.Dialer{}).DialContext(context.Background(), "tcp", s.serverListener.Addr().String())
 	require.NoError(s.T(), err, "DialContext should successfully establish a conn here")
 
+	time.Sleep(time.Millisecond)
+
 	require.NotNil(s.T(), s.tracker.listenerConnectionTagInfo)
 	require.Equal(s.T(), listenerName, s.tracker.listenerConnectionTagInfo.ListenerName)
 

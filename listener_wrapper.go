@@ -1,89 +1,76 @@
-// Copyright 2016 Michal Witkowski. All Rights Reserved.
-// See LICENSE for licensing terms.
+// Copyright (c) The go-conntrack Authors.
+// Licensed under the Apache License 2.0.
 
 package conntrack
 
 import (
+	"context"
 	"fmt"
 	"net"
-	"sync"
 	"time"
 
 	"github.com/jpillora/backoff"
-	"golang.org/x/net/trace"
 )
 
 const (
 	defaultName = "default"
 )
 
-type listenerOpts struct {
+type ListenerOptions struct {
 	name         string
-	monitoring   bool
-	tracing      bool
+	tracker      ConnectionTracker
 	tcpKeepAlive time.Duration
 	retryBackoff *backoff.Backoff
 }
 
-type listenerOpt func(*listenerOpts)
+type ListenerOption func(*ListenerOptions)
 
-// TrackWithName sets the name of the Listener for use in tracking and monitoring.
-func TrackWithName(name string) listenerOpt {
-	return func(opts *listenerOpts) {
+// ListenerWithName sets the name of the Listener for use in tracking and monitoring.
+func ListenerWithName(name string) ListenerOption {
+	return func(opts *ListenerOptions) {
 		opts.name = name
 	}
 }
 
-// TrackWithoutMonitoring turns *off* Prometheus monitoring for this listener.
-func TrackWithoutMonitoring() listenerOpt {
-	return func(opts *listenerOpts) {
-		opts.monitoring = false
+// ListenerWithTracker register [ConnectionTracker] trackers that tracks the listener interactions.
+func ListenerWithTrackers(trackers ...ConnectionTracker) ListenerOption {
+	return func(opts *ListenerOptions) {
+		opts.tracker = ChainConnectionTrackers(trackers...)
 	}
 }
 
-// TrackWithTracing turns *on* the /debug/events tracing of the live listener connections.
-func TrackWithTracing() listenerOpt {
-	return func(opts *listenerOpts) {
-		opts.tracing = true
-	}
-}
-
-// TrackWithRetries enables retrying of temporary Accept() errors, with the given backoff between attempts.
+// ListenerWithRetries enables retrying of temporary Accept() errors, with the given backoff between attempts.
 // Concurrent accept calls that receive temporary errors have independent backoff scaling.
-func TrackWithRetries(b backoff.Backoff) listenerOpt {
-	return func(opts *listenerOpts) {
+func ListenerWithRetries(b backoff.Backoff) ListenerOption {
+	return func(opts *ListenerOptions) {
 		opts.retryBackoff = &b
 	}
 }
 
-// TrackWithTcpKeepAlive makes sure that any `net.TCPConn` that get accepted have a keep-alive.
+// ListenerWithTCPKeepAlive makes sure that any `net.TCPConn` that get accepted have a keep-alive.
 // This is useful for HTTP servers in order for, for example laptops, to not use up resources on the
 // server while they don't utilise their connection.
 // A value of 0 disables it.
-func TrackWithTcpKeepAlive(keepalive time.Duration) listenerOpt {
-	return func(opts *listenerOpts) {
+func ListenerWithTCPKeepAlive(keepalive time.Duration) ListenerOption {
+	return func(opts *ListenerOptions) {
 		opts.tcpKeepAlive = keepalive
 	}
 }
 
 type connTrackListener struct {
 	net.Listener
-	opts *listenerOpts
+	opts *ListenerOptions
 }
 
 // NewListener returns the given listener wrapped in connection tracking listener.
-func NewListener(inner net.Listener, optFuncs ...listenerOpt) net.Listener {
-	opts := &listenerOpts{
-		name:       defaultName,
-		monitoring: true,
-		tracing:    false,
+func NewListener(inner net.Listener, optFuncs ...ListenerOption) net.Listener {
+	opts := &ListenerOptions{
+		name: defaultName,
 	}
 	for _, f := range optFuncs {
 		f(opts)
 	}
-	if opts.monitoring {
-		preRegisterListenerMetrics(opts.name)
-	}
+
 	return &connTrackListener{
 		Listener: inner,
 		opts:     opts,
@@ -91,24 +78,68 @@ func NewListener(inner net.Listener, optFuncs ...listenerOpt) net.Listener {
 }
 
 func (ct *connTrackListener) Accept() (net.Conn, error) {
-	// TODO(mwitkow): Add monitoring of failed accept.
+	ctx := WithListenerName(context.Background(), ct.opts.name)
+	if t, ok := ct.opts.tracker.(ListenerConnectionTagger); ok {
+		ctx = t.TagListenerConnection(ctx, &ListenerConnectionTagInfo{
+			ListenerName: ct.opts.name,
+		})
+	}
+
+	acceptStart := time.Now()
 	var (
 		conn net.Conn
 		err  error
 	)
-	for attempt := 0; ; attempt++ {
+
+	attempt := 0
+
+	for attempt = 0; ; attempt++ {
+		attempBegin := time.Now()
+		ct.opts.tracker.TrackConnection(ctx, &ConnectionAttempt{
+			Client:    false,
+			Attempt:   attempt + 1,
+			BeginTime: attempBegin,
+		})
 		conn, err = ct.Listener.Accept()
 		if err == nil || ct.opts.retryBackoff == nil {
 			break
 		}
+
 		if t, ok := err.(interface{ Temporary() bool }); !ok || !t.Temporary() {
 			break
 		}
+		ct.opts.tracker.TrackConnection(ctx, &ConnectionAttemptFailed{
+			Client:    false,
+			Attempt:   attempt + 1,
+			BeginTime: acceptStart,
+			EndTime:   time.Now(),
+			Error:     err,
+			Reason:    FailureReasonFromError(err),
+		})
 		time.Sleep(ct.opts.retryBackoff.ForAttempt(float64(attempt)))
 	}
 	if err != nil {
+		ct.opts.tracker.TrackConnection(ctx, &ConnectionFailed{
+			Client:    false,
+			Attempts:  attempt + 1,
+			BeginTime: acceptStart,
+			EndTime:   time.Now(),
+			Error:     err,
+			Reason:    FailureReasonFromError(err),
+		})
 		return nil, err
 	}
+
+	establishedTime := time.Now()
+	ct.opts.tracker.TrackConnection(ctx, &ConnectionEstablished{
+		Client:     false,
+		Attempts:   attempt + 1,
+		BeginTime:  acceptStart,
+		EndTime:    establishedTime,
+		LocalAddr:  conn.LocalAddr(),
+		RemoteAddr: conn.RemoteAddr(),
+	})
+
 	if tcpConn, ok := conn.(*net.TCPConn); ok && ct.opts.tcpKeepAlive > 0 {
 		if err := tcpConn.SetKeepAlive(true); err != nil {
 			return nil, fmt.Errorf("failed to enable keep alive: %w", err)
@@ -118,46 +149,22 @@ func (ct *connTrackListener) Accept() (net.Conn, error) {
 			return nil, fmt.Errorf("failed to set keep alive period: %w", err)
 		}
 	}
-	return newServerConnTracker(conn, ct.opts), nil
+
+	return newConnectionCloseTracker(ctx, conn, false, ct.opts.tracker, establishedTime), nil
 }
 
-type serverConnTracker struct {
-	net.Conn
-	opts  *listenerOpts
-	event trace.EventLog
-	mu    sync.Mutex
+type listenerNameKey struct{}
+
+// ListenerNameFromContext returns the name of the listener from the context.
+func ListenerNameFromContext(ctx context.Context) string {
+	val, ok := ctx.Value(listenerNameKey{}).(string)
+	if !ok {
+		return ""
+	}
+	return val
 }
 
-func newServerConnTracker(inner net.Conn, opts *listenerOpts) net.Conn {
-	tracker := &serverConnTracker{
-		Conn: inner,
-		opts: opts,
-	}
-	if opts.tracing {
-		tracker.event = trace.NewEventLog(fmt.Sprintf("net.ServerConn.%s", opts.name), fmt.Sprintf("%v", inner.RemoteAddr()))
-		tracker.event.Printf("accepted: %v -> %v", inner.RemoteAddr(), inner.LocalAddr())
-	}
-	if opts.monitoring {
-		reportListenerConnAccepted(opts.name)
-	}
-	return tracker
-}
-
-func (ct *serverConnTracker) Close() error {
-	err := ct.Conn.Close()
-	ct.mu.Lock()
-	if ct.event != nil {
-		if err != nil {
-			ct.event.Errorf("failed closing: %v", err)
-		} else {
-			ct.event.Printf("closing")
-		}
-		ct.event.Finish()
-		ct.event = nil
-	}
-	ct.mu.Unlock()
-	if ct.opts.monitoring {
-		reportListenerConnClosed(ct.opts.name)
-	}
-	return err
+// WithListenerName returns a context that will contain a listener name.
+func WithListenerName(ctx context.Context, listenerName string) context.Context {
+	return context.WithValue(ctx, listenerNameKey{}, listenerName)
 }

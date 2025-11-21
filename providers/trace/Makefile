@@ -15,4 +15,7 @@ lint:
 test:
 	go test ./...
 
-.PHONY: replace-add replace-drop deps lint test
+test-race:
+	go test -race ./...
+
+.PHONY: replace-add replace-drop deps lint test test-race

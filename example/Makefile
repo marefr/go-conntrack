@@ -17,3 +17,5 @@ lint:
 	golangci-lint run --config=../.golangci.yml
 
 test:
+
+test-race:

@@ -6,9 +6,9 @@ PROVIDER_MODULES ?= $(shell find $(PWD)/providers  -name "go.mod" | xargs dirnam
 MODULES          ?= $(PROVIDER_MODULES) example
 GOBIN            ?= $(firstword $(subst :, ,${GOPATH}))/bin
 
-.PHONY: replace-add replace-drop deps lint test $(MODULES)
+.PHONY: replace-add replace-drop deps lint test test-race $(MODULES)
 
-replace-add replace-drop deps lint test: $(MODULES)
+replace-add replace-drop deps lint test test-race: $(MODULES)
 $(MODULES):
 	$(MAKE) -C $@ $(MAKECMDGOALS)
 
@@ -47,3 +47,6 @@ lint: $(COPYRIGHT)
 
 test:
 	go test ./...
+
+test-race:
+	go test -race ./...

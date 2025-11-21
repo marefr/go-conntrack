@@ -163,7 +163,8 @@ func (s *DialerTestSuite) TestDialerRefusedFailure() {
 
 func (s *DialerTestSuite) TearDownSuite() {
 	if s.serverListener != nil {
-		s.T().Logf("stopped http.Server at: %v", s.serverListener.Addr().String())
+		s.T().Logf("stopping http.Server at: %v", s.serverListener.Addr().String())
 		s.serverListener.Close()
+		s.T().Logf("stopped http.Server at: %v", s.serverListener.Addr().String())
 	}
 }

@@ -13,102 +13,106 @@ import (
 	"github.com/marefr/go-conntrack/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 )
-
-func TestListener(t *testing.T) {
-	suite.Run(t, &ListenerTestSuite{})
-}
 
 const listenerName = "some_name"
 
-type ListenerTestSuite struct {
-	suite.Suite
+func TestListenerUnderNormalConnection(t *testing.T) {
+	listener, tracker := setupServerListener(t)
 
-	tracker        *testConnectionTracker
-	serverListener net.Listener
-	httpServer     http.Server
+	beginTime := time.Now()
+	conn, err := (&net.Dialer{}).DialContext(context.Background(), "tcp", listener.Addr().String())
+	require.NoError(t, err, "DialContext should successfully establish a conn here")
+
+	time.Sleep(time.Millisecond)
+
+	stats := tracker.GetStats()
+
+	require.Len(t, stats, 3)
+	sAttempt := stats[0].(*conntrack.ConnectionAttempt)
+	assert.NotNil(t, sAttempt)
+	assert.False(t, sAttempt.Client)
+	assert.Equal(t, 1, sAttempt.Attempt)
+	assert.NotZero(t, sAttempt.BeginTime)
+
+	sEstablished := stats[1].(*conntrack.ConnectionEstablished)
+	assert.NotNil(t, sEstablished)
+	assert.False(t, sEstablished.Client)
+	assert.Equal(t, 1, sEstablished.Attempts)
+	assert.NotZero(t, sEstablished.BeginTime)
+	assert.Greater(t, sEstablished.EndTime, sEstablished.BeginTime)
+	assert.Equal(t, listener.Addr().String(), sEstablished.LocalAddr.String())
+	assert.NotEmpty(t, sEstablished.LocalAddr.String())
+
+	sAttemptTwo := stats[2].(*conntrack.ConnectionAttempt)
+	assert.NotNil(t, sAttemptTwo)
+	assert.False(t, sAttemptTwo.Client)
+	assert.Equal(t, 1, sAttemptTwo.Attempt)
+	assert.Greater(t, sAttemptTwo.BeginTime, beginTime)
+
+	err = conn.Close()
+	assert.NoError(t, err)
+
+	time.Sleep(time.Millisecond)
+
+	stats = tracker.GetStats()
+
+	require.Len(t, stats, 4)
+	sClosed := stats[3].(*conntrack.ConnectionClosed)
+	assert.NotNil(t, sClosed)
+	assert.False(t, sClosed.Client)
+	assert.NoError(t, sClosed.Error)
+	assert.Greater(t, sClosed.BeginTime, beginTime)
+	assert.Greater(t, sClosed.EndTime, sEstablished.BeginTime)
+
+	t.Logf("stopping http.Server at: %v", listener.Addr().String())
+	err = listener.Close()
+	require.NoError(t, err, "should be able to close serverListener")
 }
 
-func (s *ListenerTestSuite) SetupTest() {
-	var err error
-	s.serverListener, err = net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(s.T(), err, "must be able to allocate a port for serverListener")
+func TestListenerWithContextName(t *testing.T) {
+	listener, tracker := setupServerListener(t)
 
-	s.tracker = newTestConnectionTracker()
-	s.serverListener = conntrack.NewListener(s.serverListener,
+	_, err := (&net.Dialer{}).DialContext(context.Background(), "tcp", listener.Addr().String())
+	require.NoError(t, err, "DialContext should successfully establish a connection here")
+
+	time.Sleep(time.Millisecond)
+
+	tagCtx, tagInfo := tracker.GetListenerTagInfo()
+	require.NotNil(t, tagInfo)
+	require.Equal(t, listenerName, tagInfo.ListenerName)
+
+	require.NotNil(t, tagCtx)
+
+	listenerNameFromCtx := conntrack.ListenerNameFromContext(tagCtx)
+	require.Equal(t, listenerName, listenerNameFromCtx)
+
+	t.Logf("stopping http.Server at: %v", listener.Addr().String())
+	err = listener.Close()
+	require.NoError(t, err, "should be able to close serverListener")
+}
+
+func setupServerListener(t *testing.T) (net.Listener, *testConnectionTracker) {
+	t.Helper()
+
+	serverListener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err, "must be able to allocate a port for serverListener")
+
+	tracker := newTestConnectionTracker()
+	serverListener = conntrack.NewListener(serverListener,
 		conntrack.ListenerWithName(listenerName),
-		conntrack.ListenerWithTrackers(s.tracker),
+		conntrack.ListenerWithTrackers(tracker),
 	)
-	s.httpServer = http.Server{
+	httpServer := http.Server{
 		Handler: http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
 			resp.WriteHeader(http.StatusOK)
 		}),
 	}
+
 	go func() {
-		_ = s.httpServer.Serve(s.serverListener)
+		err = httpServer.Serve(serverListener)
+		require.NotErrorIs(t, err, http.ErrServerClosed, "http.Server should only be closed normally")
 	}()
-}
 
-func (s *ListenerTestSuite) TestListenerUnderNormalConnection() {
-	beginTime := time.Now()
-	conn, err := (&net.Dialer{}).DialContext(context.Background(), "tcp", s.serverListener.Addr().String())
-	require.NoError(s.T(), err, "DialContext should successfully establish a conn here")
-
-	time.Sleep(time.Millisecond)
-
-	require.Len(s.T(), s.tracker.stats, 3)
-	sAttempt := s.tracker.stats[0].(*conntrack.ConnectionAttempt)
-	assert.NotNil(s.T(), sAttempt)
-	assert.False(s.T(), sAttempt.Client)
-	assert.Equal(s.T(), 1, sAttempt.Attempt)
-	assert.NotZero(s.T(), sAttempt.BeginTime)
-
-	sEstablished := s.tracker.stats[1].(*conntrack.ConnectionEstablished)
-	assert.NotNil(s.T(), sEstablished)
-	assert.False(s.T(), sEstablished.Client)
-	assert.Equal(s.T(), 1, sEstablished.Attempts)
-	assert.NotZero(s.T(), sEstablished.BeginTime)
-	assert.Greater(s.T(), sEstablished.EndTime, sEstablished.BeginTime)
-	assert.Equal(s.T(), s.serverListener.Addr().String(), sEstablished.LocalAddr.String())
-	assert.NotEmpty(s.T(), sEstablished.LocalAddr.String())
-
-	sAttemptTwo := s.tracker.stats[2].(*conntrack.ConnectionAttempt)
-	assert.NotNil(s.T(), sAttemptTwo)
-	assert.False(s.T(), sAttemptTwo.Client)
-	assert.Equal(s.T(), 1, sAttemptTwo.Attempt)
-	assert.Greater(s.T(), sAttemptTwo.BeginTime, beginTime)
-
-	err = conn.Close()
-	assert.NoError(s.T(), err)
-
-	time.Sleep(time.Millisecond)
-
-	require.Len(s.T(), s.tracker.stats, 4)
-	sClosed := s.tracker.stats[3].(*conntrack.ConnectionClosed)
-	assert.NotNil(s.T(), sClosed)
-	assert.False(s.T(), sClosed.Client)
-	assert.NoError(s.T(), sClosed.Error)
-	assert.Greater(s.T(), sClosed.BeginTime, beginTime)
-	assert.Greater(s.T(), sClosed.EndTime, sEstablished.BeginTime)
-}
-
-func (s *ListenerTestSuite) TestListenerWithContextName() {
-	_, err := (&net.Dialer{}).DialContext(context.Background(), "tcp", s.serverListener.Addr().String())
-	require.NoError(s.T(), err, "DialContext should successfully establish a conn here")
-
-	time.Sleep(time.Millisecond)
-
-	require.NotNil(s.T(), s.tracker.listenerConnectionTagInfo)
-	require.Equal(s.T(), listenerName, s.tracker.listenerConnectionTagInfo.ListenerName)
-
-	listenerNameFromCtx := conntrack.ListenerNameFromContext(s.tracker.listenerConnectionTagCtx)
-	require.Equal(s.T(), listenerName, listenerNameFromCtx)
-}
-
-func (s *ListenerTestSuite) TearDownTest() {
-	if s.serverListener != nil {
-		s.T().Logf("stopped http.Server at: %v", s.serverListener.Addr().String())
-		s.serverListener.Close()
-	}
+	return serverListener, tracker
 }

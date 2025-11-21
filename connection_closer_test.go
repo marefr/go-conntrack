@@ -41,7 +41,7 @@ func TestConnectionCloser(t *testing.T) {
 			conn := &connUnderTest{
 				closeErr: tc.closeErr,
 			}
-			beginTime := time.Now()
+			beginTime := time.Now().Add(-time.Hour)
 			closer := newConnectionCloseTracker(context.Background(), conn, tc.client, tracker, beginTime)
 			err := closer.Close()
 			require.Len(t, tracker.stats, 1)

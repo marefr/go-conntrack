@@ -1,11 +1,13 @@
 module github.com/marefr/go-conntrack/providers/trace
 
-go 1.23.0
+go 1.24.0
+
+toolchain go1.24.1
 
 require (
 	github.com/marefr/go-conntrack/v2 v2.0.9
-	github.com/stretchr/testify v1.10.0
-	golang.org/x/net v0.37.0
+	github.com/stretchr/testify v1.11.1
+	golang.org/x/net v0.47.0
 )
 
 require (

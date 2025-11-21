@@ -82,10 +82,12 @@ func setupServerListener(t *testing.T) (net.Listener, conntrack.ConnectionTracke
 }
 
 func fetchTraceEvents(t *testing.T, familyName string) string {
+	t.Helper()
+
 	resp := httptest.NewRecorder()
 	url := fmt.Sprintf("/debug/events?fam=%s&b=0&exp=1", familyName)
 	req, err := http.NewRequest("GET", url, nil)
-	require.NoError(t, err, "failed creating request for Prometheus handler")
+	require.NoError(t, err, "failed creating request for trace events handler")
 	trace.RenderEvents(resp, req, true)
 	out, err := io.ReadAll(resp.Body)
 	require.NoError(t, err, "failed reading the trace page")

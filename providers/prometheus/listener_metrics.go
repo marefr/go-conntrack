@@ -12,6 +12,7 @@ import (
 
 var _ prometheus.Collector = &ListenerMetrics{}
 
+// ListenerMetrics collects Prometheus metrics of inbound/server connection interactions.
 type ListenerMetrics struct {
 	listenerAttemptedTotal    *prometheus.CounterVec
 	listenerAcceptedTotal     *prometheus.CounterVec
@@ -21,8 +22,11 @@ type ListenerMetrics struct {
 	listenerLifetimeHistogram *prometheus.HistogramVec
 }
 
-// NewListenerMetrics returns a new ListenerMetrics object that has listener tracker methods.
-// NOTE: Remember to register ListenerMetrics object by using prometheus registry
+// NewListenerMetrics returns a new [ListenerMetrics] that can be used to report Prometheus
+// metrics of inbound/server connection interactions.
+//
+// NOTE: [ListenerMetrics] implements [prometheus.Collector] which means that you have to
+// register the collector in a Prometheus registry in order for the metrics to be collected,
 // e.g. prometheus.MustRegister(myListenerMetrics).
 func NewListenerMetrics(opts ...ListenerMetricsOption) *ListenerMetrics {
 	var config listenerMetricsConfig
@@ -68,9 +72,8 @@ func NewListenerMetrics(opts ...ListenerMetricsOption) *ListenerMetrics {
 	}
 }
 
-// Describe sends the super-set of all possible descriptors of metrics
-// collected by this Collector to the provided channel and returns once
-// the last descriptor has been sent.
+// Describe sends the super-set of all possible descriptors of metrics collected by this
+// Collector to the provided channel and returns once the last descriptor has been sent.
 func (m *ListenerMetrics) Describe(ch chan<- *prometheus.Desc) {
 	m.listenerAttemptedTotal.Describe(ch)
 	m.listenerAcceptedTotal.Describe(ch)
@@ -83,9 +86,9 @@ func (m *ListenerMetrics) Describe(ch chan<- *prometheus.Desc) {
 	}
 }
 
-// Collect is called by the Prometheus registry when collecting
-// metrics. The implementation sends each collected metric via the
-// provided channel and returns once the last metric has been sent.
+// Collect is called by the Prometheus registry when collecting metrics. The implementation
+// sends each collected metric via the provided channel and returns once the last metric has
+// been sent.
 func (m *ListenerMetrics) Collect(ch chan<- prometheus.Metric) {
 	m.listenerAttemptedTotal.Collect(ch)
 	m.listenerAcceptedTotal.Collect(ch)
@@ -98,9 +101,9 @@ func (m *ListenerMetrics) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-// InitializeMetrics initializes all metrics, with their appropriate null
-// value, for all known listener names. This is useful, to
-// ensure that all metrics exist when collecting and querying.
+// InitializeMetrics initializes all metrics, with their appropriate null value,
+// for all known listener names. This is useful, to ensure that all metrics exist
+// when collecting and querying.
 func (m *ListenerMetrics) InitializeMetrics(listenerNames ...string) {
 	for _, name := range listenerNames {
 		// These are just references (no increments), as just referencing will create the labels but not set values.
@@ -116,6 +119,8 @@ func (m *ListenerMetrics) InitializeMetrics(listenerNames ...string) {
 	}
 }
 
+// TrackListener returns a [conntrack.ConnectionTracker] that reports metrics for this [ListenerMetrics] of inbound/server
+// connection interactions.
 func (m *ListenerMetrics) TrackListener() conntrack.ConnectionTracker {
 	return newListenerReporter(m)
 }

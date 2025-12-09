@@ -12,6 +12,7 @@ import (
 
 var _ prometheus.Collector = &DialerMetrics{}
 
+// DialerMetrics collects Prometheus metrics of outbound/client connection interactions.
 type DialerMetrics struct {
 	dialerAttemptedTotal       *prometheus.CounterVec
 	dialerConnEstablishedTotal *prometheus.CounterVec
@@ -21,8 +22,11 @@ type DialerMetrics struct {
 	dialerLifetimeHistogram    *prometheus.HistogramVec
 }
 
-// NewDialerMetrics returns a new DialerMetrics object that has dialer tracker methods.
-// NOTE: Remember to register DialerMetrics object by using prometheus registry
+// NewDialerMetrics returns a new [DialerMetrics] that can be used to report Prometheus
+// metrics of outbound/client connection interactions.
+//
+// NOTE: [DialerMetrics] implements [prometheus.Collector] which means that you have to
+// register the collector in a Prometheus registry in order for the metrics to be collected,
 // e.g. prometheus.MustRegister(myDialerMetrics).
 func NewDialerMetrics(opts ...ClientMetricsOption) *DialerMetrics {
 	var config dialerMetricsConfig
@@ -68,9 +72,8 @@ func NewDialerMetrics(opts ...ClientMetricsOption) *DialerMetrics {
 	}
 }
 
-// Describe sends the super-set of all possible descriptors of metrics
-// collected by this Collector to the provided channel and returns once
-// the last descriptor has been sent.
+// Describe sends the super-set of all possible descriptors of metrics collected by this
+// Collector to the provided channel and returns once the last descriptor has been sent.
 func (m *DialerMetrics) Describe(ch chan<- *prometheus.Desc) {
 	m.dialerAttemptedTotal.Describe(ch)
 	m.dialerConnEstablishedTotal.Describe(ch)
@@ -83,9 +86,9 @@ func (m *DialerMetrics) Describe(ch chan<- *prometheus.Desc) {
 	}
 }
 
-// Collect is called by the Prometheus registry when collecting
-// metrics. The implementation sends each collected metric via the
-// provided channel and returns once the last metric has been sent.
+// Collect is called by the Prometheus registry when collecting metrics. The implementation
+// sends each collected metric via the provided channel and returns once the last metric has
+// been sent.
 func (m *DialerMetrics) Collect(ch chan<- prometheus.Metric) {
 	m.dialerAttemptedTotal.Collect(ch)
 	m.dialerConnEstablishedTotal.Collect(ch)
@@ -98,9 +101,9 @@ func (m *DialerMetrics) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-// InitializeMetrics initializes all metrics, with their appropriate null
-// value, for all known dialer names. This is useful, to
-// ensure that all metrics exist when collecting and querying.
+// InitializeMetrics initializes all metrics, with their appropriate null value,
+// for all known dialer names. This is useful, to ensure that all metrics exist
+// when collecting and querying.
 func (m *DialerMetrics) InitializeMetrics(dialerNames ...string) {
 	for _, name := range dialerNames {
 		// These are just references (no increments), as just referencing will create the labels but not set values.
@@ -120,6 +123,8 @@ func (m *DialerMetrics) InitializeMetrics(dialerNames ...string) {
 	}
 }
 
+// TrackDialer returns a [conntrack.ConnectionTracker] that reports metrics for this [DialerMetrics] of outbound/client
+// connection interactions.
 func (m *DialerMetrics) TrackDialer() conntrack.ConnectionTracker {
 	return newDialerReporter(m)
 }

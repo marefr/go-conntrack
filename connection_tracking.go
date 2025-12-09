@@ -164,7 +164,8 @@ func (c ConnectionClosed) IsClient() bool {
 	return c.Client
 }
 
-// ConnectionTracker the interface for tracking dialer and listener connections.
+// ConnectionTracker is the interface for tracking [net.Conn] connections for
+// inbound/server ([net.Listener]) and outbound/client ([net.Dialer]).
 type ConnectionTracker interface {
 	// TrackConnection tracks the
 	TrackConnection(ctx context.Context, stats ConnectionStats)
@@ -245,7 +246,7 @@ type chainConnectionTracker struct {
 
 // ChainConnectionTrackers chain multiple [ConnectionTracker] trackers together into a single [ConnectionTracker].
 //
-// Note: If trackers is nil a nil [ConnectionTracker] will be returned.
+// Note: If trackers is nil, then a nil [ConnectionTracker] will be returned.
 func ChainConnectionTrackers(trackers ...ConnectionTracker) ConnectionTracker {
 	if trackers == nil {
 		return nil

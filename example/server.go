@@ -38,7 +38,12 @@ func main() {
 
 	tracingTracker := trace.New()
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	loggingTracker := logging.New(slogadapter.Logger(logger))
+	loggingTracker, err := logging.New(slogadapter.Logger(logger))
+	if err != nil {
+		logger.Error("Failed to create logging tracker", "error", err)
+		os.Exit(1)
+	}
+
 	dialerMetrics := promtracker.NewDialerMetrics()
 	prometheus.MustRegister(dialerMetrics)
 	// Since we're using a dynamic name, let's preregister it with prometheus.

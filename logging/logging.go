@@ -5,6 +5,7 @@ package logging
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 
 	"github.com/marefr/go-conntrack/v2"
@@ -43,13 +44,21 @@ func WithAttemptLogLevel(lvl slog.Level) LoggerOption {
 	}
 }
 
+var _ conntrack.DialerConnectionTagger = &connectionTrackerLogger{}
+var _ conntrack.ListenerConnectionTagger = &connectionTrackerLogger{}
+
 type connectionTrackerLogger struct {
 	logger       Logger
 	attemptLevel slog.Level
 }
 
-// New returns a new [conntrack.ConnectionTracker] that logs dialer (client) and listener (server) connection interactions.
-func New(logger Logger, options ...LoggerOption) conntrack.ConnectionTracker {
+// New returns a new [conntrack.ConnectionTracker] that logs outbound and inbound connection interactions
+// using the provided [Logger] and optional [LoggerOption].
+func New(logger Logger, options ...LoggerOption) (conntrack.ConnectionTracker, error) {
+	if logger == nil {
+		return nil, errors.New("logger cannot be nil")
+	}
+
 	ctl := &connectionTrackerLogger{
 		logger:       logger,
 		attemptLevel: slog.LevelDebug,
@@ -59,7 +68,7 @@ func New(logger Logger, options ...LoggerOption) conntrack.ConnectionTracker {
 		opt(ctl)
 	}
 
-	return ctl
+	return ctl, nil
 }
 
 func (connectionTrackerLogger) TagDialerConnection(ctx context.Context, info *conntrack.DialerConnectionTagInfo) context.Context {

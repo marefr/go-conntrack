@@ -16,7 +16,11 @@ var _ conntrack.ListenerConnectionTagger = &tracer{}
 
 type tracer struct{}
 
-// New returns a new [conntrack.ConnectionTracker] that traces dialer (client) and listener (server) connection interactions.
+// New returns a new [conntrack.ConnectionTracker] that traces outbound and inbound connection interactions.
+// using the golang.org/x/net/trace package.
+//
+// Note: Importing this package automatically enables tracing and exports HTTP interfaces
+// on /debug/requests and /debug/events by automatically register with [http.DefaultServeMux].
 func New() conntrack.ConnectionTracker {
 	return &tracer{}
 }

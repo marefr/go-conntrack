@@ -1,7 +1,7 @@
 // Copyright (c) The go-conntrack Authors.
 // Licensed under the Apache License 2.0.
 
-// Package slog provides a logging adapter for [logging.Logger].
+// Package slogadapter provides a logging adapter for [logging.Logger].
 package slogadapter
 
 import (
@@ -11,5 +11,9 @@ import (
 )
 
 func Logger(logger *slog.Logger) logging.LoggerFunc {
+	if logger == nil {
+		return nil
+	}
+
 	return logger.LogAttrs
 }
